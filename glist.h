@@ -1,42 +1,46 @@
-/*
- * glist.h
- *
- *  Created on: 1 Sep 2020
- *      Author: avikef
- */
-
-#include "graph.h"
-
 #ifndef GLIST_H_
 #define GLIST_H_
 
-/* to represent a graph that sits
- * as a node on glist
- * */
-typedef struct graph_node {
-	graph* G;
-    struct graph_node *next;
-} graph_node;
+#include "graph.h"
 
-typedef struct _glist {
-	/* list size */
-	/*int		n;*/
+/* Linked list of graphs module.
+ * Describes the GraphList struct that is used to implement O, P. */
 
-	/* pointer to the linked list */
-	graph_node *current_graph_node;
+/* Node that contains a graph pointer */
+typedef struct _GraphNode {
+	Graph* G;
+    struct _GraphNode *next;
+} GraphNode;
 
-	/* removes graph to list beginning */
-	graph_node*	(*deque)(struct _glist *L);
+/* Struct represents a linked list that contains graphs */
+typedef struct _GraphList {
 
-	void	(*free_glist)(struct _glist *L);
+	/* Pointer to first element in list (actually a stack) */
+	GraphNode *current_graph_node;
 
-	/* add graph to list beginning */
-	void	(*enque)(struct _glist *L, graph_node *new_graph);
+	/* Removes and returns graph from list beginning */
+	GraphNode*	(*deque)(struct _GraphList *L);
 
+	/* Frees all resources of glist,
+	 * AND ALL GRAPHS\GRAPH_NODES CONTAINED IN IT */
+	void	(*free_glist)(struct _GraphList *L);
 
+	/* Add graph to list beginning */
+	void	(*enque)(struct _GraphList *L, GraphNode *new_graph);
 
-} glist;
+} GraphList;
 
-glist* glist_allocate_list();
+/* Allocates memory to a new glist */
+GraphList* allocateGraphList();
+
+/* Frees all resources of glist,
+*  AND ALL GRAPHS\GRAPH_NODES CONTAINED IN IT */
+void freeGraphList(GraphList *L);
+
+/* Removes and returns graph from list beginning */
+GraphNode* deque(GraphList *L);
+
+/* Add graph to list beginning */
+void enque(GraphList *L, GraphNode *new_graph);
 
 #endif /* GLIST_H_ */

@@ -2,42 +2,61 @@
 #define GRAPH_H_
 
 #include "spmat.h"
+
+/* Graph representation module.
+ * Contains functions that calculates every aspect of BHat[g] matrix. */
+
 /*
+ * Struct to represent a graph
  * Takes a adjacency matrix A (sparse matrix),
  * number of nodes n as input and represents a graph
  */
+typedef struct _Graph {
 
-typedef struct _graph {
+	/* Indexes vector - g length vector */
+	int *indexVector;
 
-	/* indexes vector - g length vector */
-	int *index_vector;
-
-	/* belongings vector  +-1 */
-	/*int	*s_vector;*/
-
-	/* current number of vertices */
-	int current_size;
+	/* Current number of vertices */
+	int currentSize;
 
 	/* ki vector */
-	int *k_vector;
+	int *kVector;
 
 	/* Sum of ranks -> sum of rank vector */
 	int M;
 
 	/* A[g] */
-	spmat *A_g;
+	SparseMatrix *Ag;
 
-	int *K_g_vector;
+	/* Reduced k_vector to relevant indexes */
+	int *kgVector;
 
-	double *f_vector;
+	/* fi vector for Power Iteration */
+	double *fVector;
 
+	/* Shift value for Power Iteration */
 	double shift;
 
-	void (*free_graph)(struct _graph *G);
+	void (*freeGraph)(struct _Graph *G);
 
-} graph;
+} Graph;
 
-/*graph* graph_create(int n, spmat* mother_A, int *s_vector, int *k_vector, int M);*/
-graph* graph_create(spmat* mother_A, int *index_vector, int index_vector_size, int *k_vector, int M);
+/* Creates graph using index vector and mother_A */
+Graph* graphCreate(SparseMatrix* motherA, int *indexVector,
+		int indexVectorSize, int *kVector, int M);
+
+/* Creates adj matrix using mother_A and index vector */
+void createAg(Graph *G , SparseMatrix *motherA, SparseMatrix *Ag,
+		int *indexVector, int gSize, int *kgVector, double *fVector);
+
+/* Extracts relevant elements from original k_vector */
+void extractKgVector(int *kVector, int *kgVector, int gSize, int *indexVector);
+
+/* Calculates fi AND shift WHILE create_Ag is running */
+double calculateFiAndShift(int *kgVector, int i, int gSize, int *row,
+		double sumOfRowIofA, double *fVector, int M);
+
+/* Frees all resources of graph */
+void freeGraph(Graph *G);
 
 #endif /* GRAPH_H_ */

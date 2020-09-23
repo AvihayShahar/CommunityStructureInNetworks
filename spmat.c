@@ -1,252 +1,177 @@
-/*
- * spmat.c
- *
- *  Created on: 14 May 2020
- *      Author: avikef
- */
-
-#include "spmat.h"
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
-#include <math.h>
+#include "spmat.h"
+#include "validator.h"
 
-/* defines a node struct that is used in list implementation */
+/* Allocates a new linked-lists sparse matrix of size n */
+SparseMatrix* spmatAllocateList(int n){
+	SparseMatrix *s;
+	LinkedListStruct *listStruct;
 
-spmat* spmat_allocate_list(int n);
-void linked_list_add_row(struct _spmat *A, const int *row, int i);
-spmat* spmat_allocate_array(int n, int nnz);
-void array_add_row(struct _spmat *A, const double *row, int i);
-void free_array(struct _spmat *A);
-void array_mult(const struct _spmat *A, const double *v, double *result);
-void free_linked_list(struct _spmat *A);
-void linked_list_mult(const struct _spmat *A, const double *v, double *result);
+	s = (SparseMatrix*)malloc(sizeof(SparseMatrix));
+	checkPointerForNull(s, "FAILED TO MALLOC SPMAT");
 
-void divideVectorByK(double *vector, double K, int N);
-
-spmat* spmat_allocate_list(int n){
-	spmat *s;
-	linked_List_Struct *list_struct;
-
-	s = (spmat*)malloc(sizeof(spmat));
-	assert(s != NULL);
-
-	list_struct = (linked_List_Struct*)malloc(sizeof(linked_List_Struct));
-	assert(list_struct != NULL);
+	listStruct = (LinkedListStruct*)malloc(sizeof(LinkedListStruct));
+	checkPointerForNull(listStruct, "FAILED TO MALLOC LIST STRUCT");
 
 	s->n = n;
-	s->add_row = &linked_list_add_row;
-	s->mult = &linked_list_mult;
-	s->free = &free_linked_list;
-	s->private = (linked_List_Struct*)list_struct;
-	assert(s->private != NULL);
+	s->addRow = &addRowLinkedList;
+	s->mult = &multLinkedList;
+	s->free = &freeLinkedList;
+	s->private = (LinkedListStruct*)listStruct;
 
-	list_struct->node_list = (node**)malloc(sizeof(node*)*(n+1));
-	assert(list_struct->node_list != NULL);
-	return s;
-}
-
-spmat* spmat_allocate_array(int n, int nnz){
-	spmat *s;
-	array_struct *arr_struct;
-
-	arr_struct = (array_struct*)malloc(sizeof(array_struct));
-	assert(arr_struct != NULL);
-
-	s = (spmat*)malloc(sizeof(spmat));
-	assert(s != NULL);
-
-	s->n = n;
-	s->add_row = &array_add_row;
-	s->free = &free_array;
-	s->mult = &array_mult;
-
-	s->private = (array_struct*)arr_struct;
-	assert(s->private != NULL);
-
-	/* values */
-	arr_struct->values = (double*)malloc(sizeof(double)*(nnz));
-	assert(arr_struct->values != NULL);
-	/* colind */
-	arr_struct->colind = (int*)malloc(sizeof(int)*(nnz));
-	assert(arr_struct->colind != NULL);
-	/* rowptr */
-	arr_struct->rowptr = (int*)malloc(sizeof(int)*(n + 1));
-	assert(arr_struct->rowptr != NULL);
-
-	((int*)arr_struct->rowptr)[0] = 0;
+	listStruct->nodeList = (Node**)calloc((n+1),sizeof(Node*));
+	checkPointerForNull(listStruct->nodeList, "FAILED TO MALLOC NODE LIST");
 
 	return s;
 }
 
-void linked_list_add_row(struct _spmat *A, const int *row, int i){
+/* Adds a row to spmat */
+void addRowLinkedList(struct _SparseMatrix *A, const int *row){
 	int column, isFirst;
-	node *new_node, *current_node;
-	linked_List_Struct *list_struct;
+	Node *newNode, *currentNode;
+	LinkedListStruct *listStruct;
 
 	isFirst = 1;
-	list_struct = (linked_List_Struct*)A->private;
-
-	assert(i >= 0);
-
-	/*new_node = (node*)malloc(sizeof(node));*/
-
-	/* INDICATION FOR VERTEX NUMBER */
-	/*new_node->column = i;
-	new_node->next = NULL;
-	new_node->value = 1;*/
-
-	/**(list_struct->node_list) = new_node;
-	current_node = *(list_struct->node_list);*/
+	listStruct = (LinkedListStruct*)A->private;
 
 	for(column = 0; column < A->n; column++){
 		if(*row != 0){
+			newNode = (Node*)malloc(sizeof(Node));
+			checkPointerForNull(newNode, "FAILED TO MALLOC NODE");
 
-			new_node = (node*)malloc(sizeof(node));
-			assert(new_node != NULL);
-
-			new_node->column = column;
-			new_node->value = 1;
-			new_node->next = NULL;
+			newNode->column = column;
+			newNode->next = NULL;
 
 			if(isFirst == 1){
-				*(list_struct->node_list) = new_node;
+				*(listStruct->nodeList) = newNode;
 				isFirst = 0;
-				current_node = *(list_struct->node_list);
+				currentNode = *(listStruct->nodeList);
 			}
 			else{
-				current_node->next = new_node;
-				current_node = current_node->next;
+				currentNode->next = newNode;
+				currentNode = currentNode->next;
 			}
 		}
 		row++;
 	}
-	list_struct->node_list++;
+	listStruct->nodeList++;
 }
 
-void array_add_row(struct _spmat *A, const double *row, int i){
-	int col, count;
-	array_struct *arr_struct;
-
-	assert(i >= 0);
-
-	arr_struct = (array_struct*)A->private;
-	/* needs the count of values\cols added until row i */
-
-	count = *(arr_struct->rowptr);
-
-	for(col = 0; col < A->n; col++){
-		if(*row != 0){
-
-			*(arr_struct->values) = *row;
-			*(arr_struct->colind) = col;
-
-			count++;
-			(arr_struct->values)++;
-			(arr_struct->colind)++;
-
-		}
-		row++;
-	}
-	arr_struct->rowptr += 1;
-	*(arr_struct->rowptr) = count;
-}
-
-void free_linked_list(struct _spmat *A){
-	node *current, *next_node, **arr;
+/* Frees all resources of spmat */
+void freeLinkedList(struct _SparseMatrix *A){
+	Node *current, *nextNode, **arr;
 	int i;
-	linked_List_Struct *list_struct;
+	LinkedListStruct *listStruct;
 
-	list_struct = (linked_List_Struct*)A->private;
-
-	arr = list_struct->node_list;
+	listStruct = (LinkedListStruct*)A->private;
+	arr = listStruct->nodeList;
 
 	for(i = 0; i < A->n; i++){
 		current = *arr;
 		if(current != NULL){
-			next_node = current->next;
-			while(next_node != NULL){
-				/*printf("%d", current->column);*/
+			nextNode = current->next;
+			while(nextNode != NULL){
 				free(current);
-				current = next_node;
-				next_node = next_node->next;
+				current = nextNode;
+				nextNode = nextNode->next;
 			}
 			free(current);
 		}
 		arr++;
 	}
-	free(list_struct->node_list);
-	free(list_struct);
+	free(listStruct->nodeList);
+	free(listStruct);
 	free(A);
 }
 
-void free_array(struct _spmat *A){
-	array_struct *arr_struct;
-	arr_struct = (array_struct*)A->private;
-
-	free(arr_struct->values);
-	free(arr_struct->colind);
-	free(arr_struct->rowptr);
-	free(arr_struct);
-	free(A);
-}
-
-void linked_list_mult(const struct _spmat *A, const double *v, double *result){
+/* Multiplies spmat with a vector */
+void multLinkedList(const struct _SparseMatrix *A, const double *v,
+		double *result) {
 	int i;
-	node *current, **arr;
-	double dot_product, /*denominator,*/ *tmp_result;
-	linked_List_Struct *list_struct;
+	Node *current, **arr;
+	double dotProduct;
+	LinkedListStruct *listStruct;
 
-	list_struct = (linked_List_Struct*)A->private;
-	arr = list_struct->node_list;
-
-	/*denominator = 0;*/
-	dot_product = 0;
-	tmp_result = result;
-
+	listStruct = (LinkedListStruct*)A->private;
+	arr = listStruct->nodeList;
+	dotProduct = 0;
 	current = *arr;
 
 	for(i = 0; i < A->n; i++){
 		while(current != NULL){
-			dot_product += (double)(((double)current->value) * v[current->column]);
+			dotProduct += (double)(v[current->column]);
 			current = current->next;
 		}
 		arr++;
 		current = *arr;
-		*result = dot_product;
-		/*denominator += (dot_product * dot_product);*/
+		*result = dotProduct;
 		result++;
-		dot_product = 0.0;
+		dotProduct = 0.0;
 	}
-	/*divideVectorByK(tmp_result, sqrt(denominator), A->n);*/
 }
 
-void array_mult(const struct _spmat *A, const double *v, double *result){
-	int i, j, *rowptr, *colind;
-	double *values, denominator, dot_product, *tmp_result;
-	array_struct *arr_struct;
+/* Read input graph into mother_A adj matrix using spmat */
+void readInputIntoMotherA(SparseMatrix* motherA, FILE *inputGraphFile, int n,
+		int *kVector, int *M) {
+	int checkSize, *vertexVector, *insertVector, i, j, currEdgesCount,
+	prevIndex, currentIndex, *startVertex, *startInsert;
+	LinkedListStruct *motherListStruct;
+	Node **startOfMotherNodeList;
 
-	denominator = 0;
-	tmp_result = result;
+	motherListStruct = (LinkedListStruct*)motherA->private;
+	startOfMotherNodeList = motherListStruct->nodeList;
 
-	arr_struct = (array_struct*)A->private;
-	values = (double*)arr_struct->values;
-	colind = (int*)arr_struct->colind;
-	rowptr = (int*)arr_struct->rowptr;
+	vertexVector = (int*)malloc(n*sizeof(int));
+	checkPointerForNull(vertexVector, "FAILED TO MALLOC VERTEX VECTOR");
 
+	/* calloc initializes to 0 */
+	insertVector = (int*)calloc(n, sizeof(int));
+	checkPointerForNull(insertVector, "FAILED TO MALLOC INSERT VECTOR");
 
-	for (i = 0 ; i < A->n ; i++){
-		dot_product = 0;
+	startVertex = vertexVector;
+	startInsert = insertVector;
 
-		for(j = *rowptr; j < *(rowptr + 1); j++){
-			dot_product += (double)((*values) * v[*colind]);
-			values++;
-			colind++;
+	for (i = 0; i < n; i++) {
+		prevIndex = 0;
+		currentIndex = 0;
+
+		/* Get number of edges for vertex i */
+		checkSize = fread(&currEdgesCount, sizeof(int), 1, inputGraphFile);
+		checkSizeForTarget(checkSize, 1, "FAILED TO READ CURRENT EDGES COUNT");
+
+		*kVector = currEdgesCount;
+		kVector++;
+		*M += currEdgesCount;
+
+		/* Read connected vertexes */
+		checkSize = fread(vertexVector, sizeof(int), currEdgesCount,
+				inputGraphFile);
+		checkSizeForTarget(checkSize, currEdgesCount,
+		"FAILED TO WRITE INTO VERTEX VECTOR or READ FROM INPUT GRAPH FILE");
+
+		for (j = 0; j < currEdgesCount; j++) {
+			currentIndex = *vertexVector;
+			insertVector += currentIndex - prevIndex;
+			*insertVector = 1;
+			vertexVector++;
+			prevIndex = currentIndex;
 		}
-		rowptr++;
-		*result = dot_product;
-		denominator += (dot_product * dot_product);
-		result++;
+
+		insertVector = startInsert;
+		vertexVector = startVertex;
+
+		motherA->addRow(motherA, insertVector);
+
+		/* resetting vector to 0's */
+		memset(insertVector, 0, n*sizeof(int));
 	}
-	divideVectorByK(tmp_result, sqrt(denominator), A->n);
+	if (*M == 0) {
+		printf("M EQUALS TO 0");
+		exit(-1);
+	}
+	motherListStruct->nodeList = startOfMotherNodeList;
+	free(vertexVector);
+	free(insertVector);
 }
